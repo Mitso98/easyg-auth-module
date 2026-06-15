@@ -1,0 +1,13 @@
+# Keep the Docker build context lean and reproducible. Without this, `COPY . .`
+# would overlay the host's (possibly cross-platform) node_modules onto the clean
+# `npm ci` install and bake a local .env into a build layer.
+node_modules
+dist
+coverage
+.env
+*.log
+.git
+.gitignore
+Dockerfile
+.dockerignore
+npm-debug.log*
