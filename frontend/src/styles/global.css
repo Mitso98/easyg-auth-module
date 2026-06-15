@@ -42,6 +42,13 @@
   box-sizing: border-box;
 }
 
+html {
+  /* Reserve the scrollbar gutter so a vertically/horizontally centered page never
+     jumps sideways when content grows past the viewport and a scrollbar appears
+     (e.g. inline form errors on the sign-up page). Prevents that layout shift. */
+  scrollbar-gutter: stable;
+}
+
 html,
 body {
   margin: 0;

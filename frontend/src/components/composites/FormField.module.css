@@ -13,5 +13,12 @@
 .error {
   margin: 0;
   font-size: 0.85rem;
+  line-height: 1.4;
+  /* Reserve a fixed two-line slot. The error is always in the DOM (empty when
+     valid); reserving its height keeps the field height constant whether or not a
+     message is shown, so typing never pushes the fields below. Two lines (not one)
+     because the longest password rule wraps to two lines in this narrow card —
+     explicit line-height makes the reservation deterministic across browsers. */
+  min-height: 2.8em; /* 2 × line-height */
   color: var(--color-danger);
 }

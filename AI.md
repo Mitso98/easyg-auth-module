@@ -24,6 +24,7 @@ worked, what was corrected, and decisions made differently from its suggestions.
   byte-stable across machines; a strict gate flakes red.
 - **Access-only 15m JWT; no refresh rotation** — a precise RFC-9700 note, for simplicity.
 - **`.dockerignore` in both `backend/` and `frontend/`** — excludes `node_modules/`, `dist/`, `.env`, test files, and editor artifacts from the build context; keeps the context small and prevents secrets from leaking into the image layer cache.
+- **Removed layout shifts on the auth pages.** Three fixes: (1) `FormField` now renders its error `<p>` *unconditionally* (empty when valid) with a **reserved two-line slot** in CSS, so `mode:'onChange'` validation toggling a message never reflows the fields below while typing — two lines because the longest password rule ("…at least one special character") wraps in the narrow card, and an explicit `line-height` keeps the reservation deterministic. (2) `scrollbar-gutter: stable` on `html` stops the centered card jumping sideways when growing content makes the scrollbar appear. (3) Audited the rest and left it alone on purpose — the submit button is full-width (label swap doesn't resize it), the password eye-toggle is absolutely positioned, and the spinner→content + session-expiry banner are present on first paint, so none of them shift. Keeping the always-mounted error as a single `role="alert"` is also better for screen readers (announces an inserted message without remounting the node).
 
 ## Per-phase log
 
