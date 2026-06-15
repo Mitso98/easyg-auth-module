@@ -4,6 +4,7 @@ import { ConfigModule, ConfigType } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
+import { stdSerializers } from 'pino';
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { appConfig } from './config/app.config';
@@ -38,6 +39,25 @@ function prettyLogTransport(
   }
 }
 
+// A driver/connection error can embed the MONGO_URI (with credentials) in its
+// message or stack. Strip any connection string before it is serialized so the
+// "never log the MONGO_URI" rule also holds on the error-logging path (the
+// exception filter logs `{ err }` on unexpected 5xx).
+const CONNECTION_STRING = /mongodb(\+srv)?:\/\/\S+/gi;
+const scrubConnectionString = (text: string): string =>
+  text.replace(CONNECTION_STRING, 'mongodb://[REDACTED]');
+
+const errSerializer = (error: unknown) => {
+  const serialized = stdSerializers.err(error as Error);
+  if (typeof serialized.message === 'string') {
+    serialized.message = scrubConnectionString(serialized.message);
+  }
+  if (typeof serialized.stack === 'string') {
+    serialized.stack = scrubConnectionString(serialized.stack);
+  }
+  return serialized;
+};
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -70,6 +90,8 @@ function prettyLogTransport(
           },
           // Don't spam the logs with health-probe traffic.
           autoLogging: { ignore: (req) => req.url === `/${ROUTES.HEALTH}` },
+          // Scrub a MONGO_URI (with credentials) out of any logged error.
+          serializers: { err: errSerializer },
           // Never let a credential, cookie, or token reach the logs.
           redact: {
             paths: [
