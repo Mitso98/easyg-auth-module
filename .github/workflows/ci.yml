@@ -5,21 +5,37 @@ on:
     branches: [main]
   pull_request:
 
+# Least-privilege GITHUB_TOKEN. This pipeline only reads source and uploads an
+# artifact; pinning contents:read at the top drops every other scope to none, so
+# a compromised dependency/action can't push code or publish packages.
+permissions:
+  contents: read
+
 # Cancel superseded runs on the same ref.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Actions are pinned to commit SHAs (a moved tag would run arbitrary code with
+# our token). Dependabot (.github/dependabot.yml) bumps the pins and surfaces
+# majors (e.g. dorny/paths-filter v3 -> v4) as reviewable PRs.
 jobs:
   # Detect which package changed so we only run the legs that matter.
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      docker: ${{ steps.filter.outputs.docker }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # No authenticated git ops after clone — don't leave the token in .git/config.
+          persist-credentials: false
+      - name: Detect changed packages
+        uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3
         id: filter
         with:
           filters: |
@@ -27,33 +43,46 @@ jobs:
               - 'backend/**'
             frontend:
               - 'frontend/**'
+            # The image stack also depends on the root compose file, which is not
+            # under backend/ or frontend/. The Dockerfiles + nginx.conf already
+            # live inside those package globs, so only the compose file is extra.
+            docker:
+              - 'backend/**'
+              - 'frontend/**'
+              - 'docker-compose.yml'
 
   # lint -> typecheck -> test -> build for each changed package.
   verify:
     needs: changes
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         package: [backend, frontend]
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node
         if: ${{ needs.changes.outputs[matrix.package] == 'true' }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '22'
+          # Single source of truth for the Node version (also used by the Dockerfiles).
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: ${{ matrix.package }}/package-lock.json
 
       # Cache the pinned mongod binary so the in-process Mongo tests don't re-download.
+      # Key is scoped to OS/arch since the cached binary is platform-specific.
       - name: Cache mongodb-memory-server binary
         if: ${{ matrix.package == 'backend' && needs.changes.outputs.backend == 'true' }}
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/mongodb-binaries
-          key: mongodb-binaries-7.0.14
+          key: mongodb-binaries-${{ runner.os }}-${{ runner.arch }}-7.0.14
 
       - name: Install
         if: ${{ needs.changes.outputs[matrix.package] == 'true' }}
@@ -86,11 +115,16 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          node-version: '22'
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - name: Install
@@ -99,17 +133,38 @@ jobs:
       - name: Generate openapi.json
         working-directory: backend
         run: npm run openapi:gen
-      - uses: actions/upload-artifact@v4
+      - name: Upload OpenAPI spec
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: openapi
           path: openapi.json
 
-  # Build the same-origin image stack (build only — no push).
+  # Build the same-origin image stack (build only — no push). Gated on the docker
+  # filter so a docs-only change doesn't rebuild every image.
   docker:
+    needs: changes
+    if: ${{ needs.changes.outputs.docker == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
       - name: Provide backend env (compose env_file; build-time only)
         run: cp backend/.env.example backend/.env
       - name: docker compose build
         run: docker compose build
+
+  # Single stable status check to require in branch protection. The verify matrix
+  # expands to context-specific names and openapi/docker can be skipped, which are
+  # awkward to require individually; this gate aggregates them (skipped != failure).
+  ci-green:
+    if: always()
+    needs: [changes, verify, openapi, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any leg failed or was cancelled
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1

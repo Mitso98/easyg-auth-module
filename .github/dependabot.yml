@@ -1,0 +1,8 @@
+version: 2
+updates:
+  # Keep CI actions patched and surface major bumps the SHA pin / floating tags
+  # won't pick up on their own (e.g. dorny/paths-filter v3 -> v4) as reviewable PRs.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

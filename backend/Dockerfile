@@ -3,6 +3,7 @@
 # ---- Build stage ----
 # Build and runtime share the SAME base image so any native module resolves
 # against the same libc (@node-rs/argon2 ships prebuilt binaries anyway).
+# Node major kept in sync with .nvmrc / CI (FROM can't read .nvmrc directly).
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 COPY package*.json ./

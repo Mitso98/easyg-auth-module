@@ -2,6 +2,7 @@
 
 # ---- Build stage ----
 # Node 22: Vite 8 requires Node >=20.19/22.12.
+# Node major kept in sync with .nvmrc / CI (FROM can't read .nvmrc directly).
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 # Baked at build time; relative path kept so the SPA stays same-origin.
