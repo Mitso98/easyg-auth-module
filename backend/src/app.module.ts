@@ -19,6 +19,25 @@ import { HealthModule } from './health/health.module';
 // Default rate limit (per IP) — the auth routes tighten this further.
 const DEFAULT_THROTTLE = { ttl: 60_000, limit: 100 };
 
+/**
+ * Pretty logs are a dev convenience. `pino-pretty` is a devDependency, so it is
+ * absent from the production image (`npm ci --omit=dev`). Resolve it defensively
+ * so a dev-mode container (or any environment without the dep) degrades to
+ * structured JSON instead of crashing at boot when pino's worker can't load the
+ * transport target.
+ */
+function prettyLogTransport(
+  nodeEnv: string,
+): { target: string; options: Record<string, unknown> } | undefined {
+  if (nodeEnv !== NODE_ENV.DEVELOPMENT) return undefined;
+  try {
+    require.resolve('pino-pretty');
+    return { target: 'pino-pretty', options: { singleLine: true } };
+  } catch {
+    return undefined;
+  }
+}
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -65,12 +84,9 @@ const DEFAULT_THROTTLE = { ttl: 60_000, limit: 100 };
             ],
             censor: '[REDACTED]',
           },
-          // Pretty logs only in dev; prod and test emit plain JSON (and avoid
-          // spawning the pino-pretty worker thread).
-          transport:
-            app.nodeEnv === NODE_ENV.DEVELOPMENT
-              ? { target: 'pino-pretty', options: { singleLine: true } }
-              : undefined,
+          // Pretty logs only in dev *and only if pino-pretty resolves*; prod and
+          // test (and a dev-mode prod image) emit plain JSON. See prettyLogTransport.
+          transport: prettyLogTransport(app.nodeEnv),
         },
       }),
     }),
