@@ -65,9 +65,12 @@ const DEFAULT_THROTTLE = { ttl: 60_000, limit: 100 };
             ],
             censor: '[REDACTED]',
           },
-          transport: app.isProduction
-            ? undefined
-            : { target: 'pino-pretty', options: { singleLine: true } },
+          // Pretty logs only in dev; prod and test emit plain JSON (and avoid
+          // spawning the pino-pretty worker thread).
+          transport:
+            app.nodeEnv === NODE_ENV.DEVELOPMENT
+              ? { target: 'pino-pretty', options: { singleLine: true } }
+              : undefined,
         },
       }),
     }),

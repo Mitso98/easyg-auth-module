@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Transform, TransformFnParams } from 'class-transformer';
 import {
   IsEmail,
@@ -23,17 +24,29 @@ const trimLower = ({ value }: TransformFnParams): unknown =>
  * sees one canonical form.
  */
 export class SignUpDto {
+  @ApiProperty({ example: 'ada@example.com', maxLength: VALIDATION.EMAIL.MAX })
   @Transform(trimLower)
   @IsEmail({}, { message: 'A valid email is required' })
   @MaxLength(VALIDATION.EMAIL.MAX)
   email: string;
 
+  @ApiProperty({
+    example: 'Ada Lovelace',
+    minLength: VALIDATION.NAME.MIN,
+    maxLength: VALIDATION.NAME.MAX,
+  })
   @Transform(trim)
   @IsString()
   @MinLength(VALIDATION.NAME.MIN)
   @MaxLength(VALIDATION.NAME.MAX)
   name: string;
 
+  @ApiProperty({
+    example: 'Sup3r$ecret',
+    minLength: VALIDATION.PASSWORD.MIN,
+    maxLength: VALIDATION.PASSWORD.MAX,
+    description: 'At least one letter, one number, and one special character.',
+  })
   @IsString()
   @MinLength(VALIDATION.PASSWORD.MIN)
   @MaxLength(VALIDATION.PASSWORD.MAX)

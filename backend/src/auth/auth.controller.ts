@@ -1,6 +1,5 @@
 import {
   Body,
-  ConflictException,
   Controller,
   Get,
   HttpCode,
@@ -11,17 +10,19 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
+import {
+  ApiConflictResponse,
+  ApiCookieAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { CookieOptions, Response } from 'express';
 import { appConfig } from '../config/app.config';
-import {
-  API,
-  AUTH_MESSAGES,
-  AUTH_THROTTLE,
-  COOKIE,
-  ROUTES,
-} from '../common/constants';
-import { EmailAlreadyExistsError } from '../common/errors/email-already-exists.error';
+import { API, AUTH_THROTTLE, COOKIE, ROUTES } from '../common/constants';
 import { AuthService } from './auth.service';
 import { SignUpDto } from './dto/sign-up.dto';
 import { SignInDto } from './dto/sign-in.dto';
@@ -35,6 +36,7 @@ import { CurrentUser } from './decorators/current-user.decorator';
  * Nest still serializes the returned DTO. The JWT lives ONLY in the cookie — it
  * is never placed in a response body.
  */
+@ApiTags('auth')
 @Controller({ path: ROUTES.AUTH, version: API.DEFAULT_VERSION })
 export class AuthController {
   constructor(
@@ -45,21 +47,28 @@ export class AuthController {
   @Post(ROUTES.SIGN_UP)
   @Throttle({ default: AUTH_THROTTLE })
   @HttpCode(HttpStatus.CREATED)
-  async signUp(@Body() dto: SignUpDto): Promise<UserResponseDto> {
-    try {
-      return await this.auth.signUp(dto);
-    } catch (error) {
-      if (error instanceof EmailAlreadyExistsError) {
-        // Generic — never confirms whether the email already exists.
-        throw new ConflictException(AUTH_MESSAGES.EMAIL_TAKEN);
-      }
-      throw error;
-    }
+  @ApiOperation({ summary: 'Register a new account' })
+  @ApiCreatedResponse({ type: UserResponseDto })
+  @ApiConflictResponse({
+    description: 'Generic conflict (never confirms the email exists)',
+  })
+  signUp(@Body() dto: SignUpDto): Promise<UserResponseDto> {
+    // A duplicate email throws EmailAlreadyExistsError from the repository; the
+    // global exception filter maps it to a generic 409 (EMAIL_TAKEN) — no echo.
+    return this.auth.signUp(dto);
   }
 
   @Post(ROUTES.SIGN_IN)
   @Throttle({ default: AUTH_THROTTLE })
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Sign in',
+    description:
+      'On success sets the httpOnly `access_token` cookie. The JWT is never ' +
+      'returned in the body. Unknown email and wrong password return the same 401.',
+  })
+  @ApiOkResponse({ type: UserResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Invalid email or password' })
   async signIn(
     @Body() dto: SignInDto,
     @Res({ passthrough: true }) res: Response,
@@ -74,6 +83,8 @@ export class AuthController {
 
   @Post(ROUTES.SIGN_OUT)
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sign out', description: 'Clears the auth cookie.' })
+  @ApiOkResponse({ schema: { example: { success: true } } })
   signOut(@Res({ passthrough: true }) res: Response): { success: true } {
     res.clearCookie(COOKIE.ACCESS_TOKEN, this.cookieOptions());
     return { success: true };
@@ -81,6 +92,13 @@ export class AuthController {
 
   @Get(ROUTES.ME)
   @UseGuards(JwtAuthGuard)
+  @ApiCookieAuth(COOKIE.ACCESS_TOKEN)
+  @ApiOperation({
+    summary: 'Current user',
+    description: 'Requires the auth cookie.',
+  })
+  @ApiOkResponse({ type: UserResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid auth cookie' })
   me(@CurrentUser() user: UserResponseDto): UserResponseDto {
     return user;
   }

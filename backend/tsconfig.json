@@ -21,5 +21,12 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false
+  },
+  "ts-node": {
+    "comment": "Compile as CommonJS for ts-node scripts (e.g. openapi:gen) so dynamic import() resolves .ts via the ts-node require hook.",
+    "compilerOptions": {
+      "module": "CommonJS",
+      "moduleResolution": "node"
+    }
   }
 }
