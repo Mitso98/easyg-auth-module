@@ -118,4 +118,21 @@ _TODO: other decisions made against the default AI suggestion._
   service throws the domain error and the global filter maps it (thinner
   controller, correct `EMAIL_TAKEN` code).
 
-_TODO: subsequent phases (frontend, ops)._
+### Phase 5 — Frontend scaffold
+
+- Atomic-design folders (`ui`/`composites`/`sections`/`layouts` → `pages`),
+  `services`/`hooks`/`context`/`schemas`/`config`/`styles`. One global stylesheet
+  (tokens + reset); everything else is a co-located CSS Module.
+- **One axios instance** (`services/http.ts`), `withCredentials: true` so the
+  httpOnly cookie rides along; a 401 interceptor calls an injected
+  `onUnauthorized` (set by AuthContext — keeps the service layer free of
+  React/router) and rejects with a normalized `{ message, code }`.
+- **Env** validated once at startup; default `'/api/v1'` (relative, same-origin)
+  so the browser only hits its own origin — the Vite dev proxy is the local
+  mirror of the nginx proxy in deploy. `openapi.json` is the FE/BE contract.
+- Router: central `createBrowserRouter` config with a placeholder `ProtectedRoute`
+  over `/app`.
+- Toolchain note: Vite 8 (rolldown) needs Node ≥20.19/22.12; the Docker `node:lts`
+  image and CI satisfy it. Local typecheck/lint run on the older Node.
+
+_TODO: subsequent phases (auth UI, wiring/tests, ops)._

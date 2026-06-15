@@ -1,0 +1,67 @@
+/*
+ * The ONLY global stylesheet: design tokens + a minimal reset. Imported once in
+ * main.tsx. Everything else is a co-located CSS Module.
+ */
+:root {
+  /* color */
+  --color-bg: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-text: #1f2430;
+  --color-text-muted: #5b6472;
+  --color-border: #d8dce3;
+  --color-primary: #3257f0;
+  --color-primary-hover: #2845c8;
+  --color-primary-contrast: #ffffff;
+  --color-danger: #c0322b;
+  --color-danger-bg: #fdecea;
+  --color-focus: #3257f0;
+
+  /* spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-8: 48px;
+
+  /* radius + elevation */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --shadow-card: 0 6px 24px rgba(20, 28, 48, 0.08);
+
+  /* type */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Visible, consistent focus for keyboard users. */
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
