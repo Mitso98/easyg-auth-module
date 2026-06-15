@@ -134,22 +134,6 @@ the nginx topology enables blue-green (`api_blue`/`api_green` upstreams +
 `nginx -s reload`) as a one-config-change next step. A single free instance
 restarts in place (brief blip).
 
-## Decisions
-
-| Area | Now | Documented next step |
-|---|---|---|
-| HTTP engine | Express (default) | Fastify rejected — invisible behind an argon2-bound endpoint |
-| Hashing | `@node-rs/argon2` (argon2id, prebuilt) | avoids the node-gyp/native-build Docker trap |
-| JWT | access-only 15m, httpOnly cookie | refresh rotation + reuse detection (RFC 9700) |
-| Topology | same-origin (proxy/serve-from-API) | Origin-allowlist guard *if* ever cross-site |
-| Throttling | in-memory `@nestjs/throttler` | shared store (Redis) — current store resets on restart |
-| Logging | `nestjs-pino` JSON + redaction | pino over winston; request-id correlation end-to-end |
-| Tests | thin pyramid + `mongodb-memory-server` | Playwright e2e, testcontainers, coverage |
-| CI/CD | unified build CI (no deploy) | CD intentionally out of scope for a screening task |
-| Validation | zod (FE) / Joi env + class-validator (BE) | see [AI.md](AI.md) |
-
-> No N+1 paths exist in single-user auth; list endpoints would batch with `$in`.
-
 See **[AI.md](AI.md)** for the AI-assisted build log and **[SECURITY.md](SECURITY.md)**
 for the threat model.
 
