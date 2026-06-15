@@ -159,4 +159,22 @@ _TODO: other decisions made against the default AI suggestion._
   (`htmlFor`/`id`, `aria-invalid`/`aria-describedby`, toggle `aria-pressed`).
   Confirm-password, eye toggle, and sign-out are deliberate extras.
 
-_TODO: subsequent phases (wiring/tests, ops)._
+### Phase 7 — FE wiring + tests
+
+- **Cookie hydration** — AuthContext calls `getMe()` once on mount; a 401 there is
+  "logged out", not an error. Successful signin/signup stores the user and the
+  form navigates to the from-location or `/app`.
+- **Session-expiry path** — the axios 401 interceptor calls AuthContext's
+  handler, which uses a ref to tell an *expired active session* (→ redirect to
+  `/signin` with `state.reason='expired'`, surfacing the polite `role="status"`
+  banner) apart from the initial unauthenticated hydration or a failed signin.
+- **Tests (Vitest + RTL, 10)** — table-driven `auth.schema` cases (each password
+  rule, too-long, confirm-mismatch, bad email); SignUpForm shows the policy error
+  and keeps submit disabled while invalid; ProtectedRoute redirects an
+  unauthenticated `/app` visit to `/signin` (service mocked). Vitest over Jest for
+  a Vite stack (shares the transform pipeline).
+- Verified under Node 22: `tsc`, ESLint, all 10 tests, and the Vite production
+  build pass. (The toolchain needs Node ≥20.19; the one-command demo is
+  `docker compose up`, where the image runs `node:lts`.)
+
+_TODO: P8 ops (CI, docker, docs)._

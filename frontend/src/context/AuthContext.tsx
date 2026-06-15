@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import type { User } from '../services/authService';
+import { setUnauthorizedHandler } from '../services/http';
 import type { SignInValues, SignUpValues } from '../schemas/auth.schema';
 import { AuthContext } from './auth-context';
 import type { AuthContextValue } from './auth-context';
@@ -15,6 +16,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const navigate = useNavigate();
+
+  // Track whether a session is currently active so the 401 interceptor can tell
+  // an *expired* session apart from the initial unauthenticated hydration.
+  const hasSessionRef = useRef(false);
+  useEffect(() => {
+    hasSessionRef.current = user !== null;
+  }, [user]);
+
+  // Wire the axios 401 interceptor: only an EXPIRED active session triggers the
+  // redirect + banner; a 401 during hydration or a failed signin is ignored here
+  // (handled by the caller) so we don't show "session expired" on first load.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      if (!hasSessionRef.current) return;
+      setUser(null);
+      navigate('/signin', { replace: true, state: { reason: 'expired' } });
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [navigate]);
 
   useEffect(() => {
     let active = true;
