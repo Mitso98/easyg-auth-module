@@ -5,46 +5,11 @@ worked, what was corrected, and decisions made differently from its suggestions.
 
 ## How I used AI
 
-AI drove the repetitive, well-specified work fast: monorepo scaffold, NestJS
-modules/DTOs/providers, CSS-Module components, the Jest/Vitest harnesses, Swagger
-decorators, CI YAML, and docs. Human judgment owned the load-bearing decisions —
-the **same-origin cookie topology**, the **timing-uniform/anti-enumeration**
-signin, the **error/redaction** contract, and the resilience policy — and the
-integration tests that *prove* the security claims rather than assert them in
-prose. The plan/`CLAUDE.md` encoded those rules up front so each step inherited
-them; AI then filled in the mechanics. Every phase was verified (build, lint,
-typecheck, tests) before committing.
-
-## Prompts that worked
-
-- **Rules-first, then phases.** Putting the cross-cutting rules in `CLAUDE.md`
-  and keeping each phase prompt a thin "Follow CLAUDE.md + do X" produced
-  consistent output with little restating.
-- **Naming the invariant, not just the feature** — e.g. "timing-uniform signin:
-  run `verify` against a dummy hash on the unknown-email path" yielded the right
-  code *and* a matching test, vs a vague "add login".
-- **"Make the claim verifiable"** — asking for a test that spies `verify` once on
-  both failure paths turned a prose security claim into a check.
+- **Requirements → solid prompt** — wrote down the project requirements first, then gave them to the AI to refine into a precise, unambiguous prompt. This front-loaded the thinking and avoided vague instructions that produce vague output.
+- **AI-assisted rule writing** — used AI to help draft the `CLAUDE.md` rule files (architecture, security, database, frontend conventions). Describing *what* I wanted and asking it to make the rules explicit surfaced edge cases I hadn't considered.
+- **Rules as a behaviour contract** — the rules weren't documentation; they were loaded into every AI session to constrain output to the expected patterns. Consistent rules meant consistent, reviewable code across the whole project.
 
 ## What I fixed / changed
-
-- **Domain-error mapping moved out of the controller.** AI first caught the
-  duplicate-email error in the controller; moving it to the global filter gave a
-  thinner controller and the correct `EMAIL_TAKEN` code. (Caught by a test.)
-- **`isolatedModules`/`emitDecoratorMetadata`** forced `import type` for
-  type-only symbols in decorated signatures (`ConfigType`, express `Response`)
-  and blocked referencing argon2's const enum by name — fixed by literals.
-- **OpenAPI generation** initially booted the full app (needs Mongo) and tripped
-  import-time config validation; switched to Nest **preview mode** + env-before-
-  dynamic-import + ts-node CommonJS so it runs DB-free in CI.
-- **Throttler in tests** can't be overridden (it's an `APP_GUARD` enhancer);
-  switched to resetting its in-memory store between tests.
-- **React Fast Refresh** rule required moving the context object out of the
-  provider file.
-- **Toolchain reality:** Vite 8 needs Node ≥20.19; pinned Docker/CI to Node 22
-  (local Node was older) and verified the FE build + tests there.
-
-## Decisions made differently
 
 - **`@node-rs/argon2`, not `node-argon2`.** Prebuilt binaries avoid the
   node-gyp/native-build Docker trap; argon2id over bcrypt (no 72-byte truncation).
@@ -52,18 +17,13 @@ typecheck, tests) before committing.
   (that's an availability footgun, worse on a cold-starting free tier);
   `process.exit(1)` is reserved for `uncaughtException`.
 - **Same-origin everywhere, so no CSRF token** — a cross-site `pages.dev →
-  onrender.com` split would silently drop the cookie. Reverse proxy / serve-SPA-
-  from-Nest instead.
+  onrender.com` split would silently drop the cookie. Reverse proxy for simplicity.
 - **`@Res({ passthrough: true })`** to set the cookie while keeping Nest's
   serializer (and the `UserResponseDto` mapping) intact.
 - **`openapi.json` as a CI artifact, not a git-diff gate** — swagger output isn't
   byte-stable across machines; a strict gate flakes red.
-- **Access-only 15m JWT; no refresh rotation** — a precise RFC-9700 note reads
-  more senior than a half-finished token-family table.
-- **Validation libraries:** zod on the FE (type inference, RHF integration), Joi
-  for backend env validation (Node, no bundle concern), class-validator DTOs as
-  the server trust boundary. Valibot considered; bundle savings are irrelevant for
-  a 4-field, server-authoritative form.
+- **Access-only 15m JWT; no refresh rotation** — a precise RFC-9700 note, for simplicity.
+- **`.dockerignore` in both `backend/` and `frontend/`** — excludes `node_modules/`, `dist/`, `.env`, test files, and editor artifacts from the build context; keeps the context small and prevents secrets from leaking into the image layer cache.
 
 ## Per-phase log
 
