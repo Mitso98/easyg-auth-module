@@ -53,4 +53,25 @@ _TODO: other decisions made against the default AI suggestion._
   (whitelist/forbid/transform, no implicit conversion), helmet, 16kb body cap,
   `trust proxy`, shutdown hooks. Compose backend healthcheck hits `/health`.
 
-_TODO: subsequent phases (auth core, hardening, docs/tests, frontend, ops)._
+### Phase 2 — Auth core
+
+- **Timing-uniform signin** — a `DUMMY_PASSWORD_HASH` is precomputed at boot via
+  the *real* `PasswordHasher.hash()`; the unknown-email path still runs
+  `verify()` against it, so response time doesn't reveal account existence.
+  Unknown email and wrong password throw the *same* `INVALID_CREDENTIALS` 401.
+- **argon2id** via `@node-rs/argon2` behind a `PasswordHasher` abstraction (DI
+  seam); params centralized so real + dummy hashes share identical cost. A
+  malformed stored hash makes `verify()` return false, never throw.
+- **JWT is cookie-only** — issued as an httpOnly + SameSite=Lax cookie (Secure in
+  prod), never in a response body (XSS-safe vs localStorage). The service signs +
+  returns the string; the controller sets the cookie via `@Res({ passthrough })`
+  so Nest still serializes the `UserResponseDto`.
+- **NoSQL injection** closed at the DTO: `@IsString`/`@IsEmail` reject an operator
+  object (`{ "$gt": "" }`) before it can reach a query; `strictQuery` is a second
+  layer. Only `users.repository.ts` touches the model (single query surface); it
+  maps Mongo `11000` → `EmailAlreadyExistsError` → generic 409 (no email echo).
+- Build note: `isolatedModules` + `emitDecoratorMetadata` forces `import type`
+  for type-only symbols used in decorated signatures (`ConfigType`, express
+  `Response`) and forbids referencing the argon2 const enum by name.
+
+_TODO: subsequent phases (hardening, docs/tests, frontend, ops)._

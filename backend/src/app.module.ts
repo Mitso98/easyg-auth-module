@@ -7,6 +7,7 @@ import { jwtConfig } from './config/jwt.config';
 import { envValidationSchema } from './config/env.validation';
 import { NODE_ENV } from './common/constants';
 import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 
 @Module({
@@ -34,6 +35,7 @@ import { HealthModule } from './health/health.module';
       }),
     }),
     UsersModule,
+    AuthModule,
     HealthModule,
   ],
 })

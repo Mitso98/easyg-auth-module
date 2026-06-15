@@ -3,6 +3,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigType } from '@nestjs/config';
 import { RequestMethod, ValidationPipe, VersioningType } from '@nestjs/common';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { json } from 'express';
 import { AppModule } from './app.module';
 import { appConfig } from './config/app.config';
@@ -15,6 +16,8 @@ async function bootstrap() {
   // Security headers + a bounded JSON body (reject oversized payloads early).
   app.use(helmet());
   app.use(json({ limit: BODY_LIMIT }));
+  // Parse cookies so the JWT strategy can read the httpOnly access_token.
+  app.use(cookieParser());
 
   // Trust the reverse proxy (nginx) so req.protocol / req.ip reflect the real
   // client — needed for the Secure cookie behind TLS and the throttler's IP.

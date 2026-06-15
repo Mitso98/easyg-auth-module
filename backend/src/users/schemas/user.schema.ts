@@ -16,6 +16,9 @@ export type UserDocument = HydratedDocument<User>;
  */
 @Schema({
   timestamps: true,
+  // Strip query conditions on non-schema paths — defence in depth against an
+  // operator object slipping into a filter (the DTO is the primary guard).
+  strictQuery: true,
   toJSON: {
     versionKey: false,
     virtuals: false,
