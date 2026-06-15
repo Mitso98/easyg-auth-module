@@ -1,13 +1,19 @@
 import { Link } from 'react-router-dom';
+import { SignUpForm } from '../components/sections/SignUpForm';
+import styles from './AuthPage.module.css';
 
-// Placeholder — the real sign-up form lands in P6.
 export function SignUpPage() {
   return (
-    <main>
-      <h1>Create account</h1>
-      <p>
-        Already registered? <Link to="/signin">Sign in</Link>
-      </p>
+    <main className={styles.page}>
+      <section className={styles.card}>
+        <h1 className={styles.title}>Create account</h1>
+
+        <SignUpForm />
+
+        <p className={styles.alt}>
+          Already registered? <Link to="/signin">Sign in</Link>
+        </p>
+      </section>
     </main>
   );
 }

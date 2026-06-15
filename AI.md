@@ -135,4 +135,28 @@ _TODO: other decisions made against the default AI suggestion._
 - Toolchain note: Vite 8 (rolldown) needs Node ≥20.19/22.12; the Docker `node:lts`
   image and CI satisfy it. Local typecheck/lint run on the older Node.
 
-_TODO: subsequent phases (auth UI, wiring/tests, ops)._
+### Phase 6 — Frontend auth UI
+
+- **Atomic design** — `ui` (Input/Button/IconButton/Spinner) → `composites`
+  (FormField, PasswordInput owning the eye toggle) → `sections` (SignInForm,
+  SignUpForm) → `layouts` (RootLayout) → `pages`. Every component has a co-located
+  CSS Module; no inline styles.
+- **One shared zod schema** (`auth.schema.ts`) mirrors the backend password policy
+  verbatim; `confirmPassword` via `.refine`; types via `z.infer`. Client
+  validation is UX only (server authoritative). zod **v4** uses top-level
+  `z.email()`.
+- **AuthContext tracks the USER, never the token** (httpOnly cookie). It hydrates
+  once on mount via `GET /me` (401 = logged-out, not an error), memoizes its value
+  + `useCallback`s actions, and lives inside the router (RootLayout) so it can
+  navigate. The context object sits in its own module (React Fast Refresh rule).
+- **authService** is the only caller of the axios instance; `confirmPassword` is
+  never sent (and the backend would reject it). Signup auto-signs-in to establish
+  the cookie.
+- **ProtectedRoute** shows a spinner while `isInitializing` (no redirect-before-
+  hydration flash), else redirects to `/signin` with `state.from`.
+- **Anti-enumeration on the client** — auth failures show ONE generic form-level
+  `role="alert"`, never inferring which field failed. a11y throughout
+  (`htmlFor`/`id`, `aria-invalid`/`aria-describedby`, toggle `aria-pressed`).
+  Confirm-password, eye toggle, and sign-out are deliberate extras.
+
+_TODO: subsequent phases (wiring/tests, ops)._
