@@ -74,4 +74,23 @@ _TODO: other decisions made against the default AI suggestion._
   for type-only symbols used in decorated signatures (`ConfigType`, express
   `Response`) and forbids referencing the argon2 const enum by name.
 
-_TODO: subsequent phases (hardening, docs/tests, frontend, ops)._
+### Phase 3 — Backend hardening
+
+- **Error envelope** — one global `AllExceptionsFilter` shapes every failure into
+  `{ code, message, timestamp, path, requestId }`. Security asymmetry: logs carry
+  the full error, responses stay opaque (stacks / driver errors / `MONGO_URI`
+  never leak); unknown errors collapse to a generic 500.
+- **Structured logging** — `nestjs-pino` (pino over winston): one `x-request-id`
+  threads logs + envelope + a response header for one-line triage; 4xx log at
+  warn, 5xx at error; `/health` excluded; `pino-pretty` only outside prod.
+  Redaction censors `authorization`/`cookie`/`*.password`/`*.token`.
+- **Resilience** — `unhandledRejection` is **logged and the server keeps running**
+  (hard-exiting on every stray rejection is an availability footgun, worse on a
+  cold-starting free tier); `process.exit(1)` is reserved for `uncaughtException`,
+  with `restart: unless-stopped` as the net.
+- **Throttling** — global `ThrottlerGuard` + a tight `5/60s` on signin/signup
+  (real client IP via `trust proxy`). In-memory store is per-instance and resets
+  on restart — documented limitation, not durable brute-force protection (Redis
+  in prod).
+
+_TODO: subsequent phases (docs/tests, frontend, ops)._

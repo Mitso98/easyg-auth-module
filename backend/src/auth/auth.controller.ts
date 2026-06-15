@@ -11,9 +11,16 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
 import type { CookieOptions, Response } from 'express';
 import { appConfig } from '../config/app.config';
-import { API, AUTH_MESSAGES, COOKIE, ROUTES } from '../common/constants';
+import {
+  API,
+  AUTH_MESSAGES,
+  AUTH_THROTTLE,
+  COOKIE,
+  ROUTES,
+} from '../common/constants';
 import { EmailAlreadyExistsError } from '../common/errors/email-already-exists.error';
 import { AuthService } from './auth.service';
 import { SignUpDto } from './dto/sign-up.dto';
@@ -36,6 +43,7 @@ export class AuthController {
   ) {}
 
   @Post(ROUTES.SIGN_UP)
+  @Throttle({ default: AUTH_THROTTLE })
   @HttpCode(HttpStatus.CREATED)
   async signUp(@Body() dto: SignUpDto): Promise<UserResponseDto> {
     try {
@@ -50,6 +58,7 @@ export class AuthController {
   }
 
   @Post(ROUTES.SIGN_IN)
+  @Throttle({ default: AUTH_THROTTLE })
   @HttpCode(HttpStatus.OK)
   async signIn(
     @Body() dto: SignInDto,

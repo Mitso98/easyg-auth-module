@@ -32,3 +32,6 @@ export const ARGON2_OPTIONS = {
 } as const;
 
 export const JWT_ALGORITHM = 'HS256' as const;
+
+/** Tight per-IP limit on the credential endpoints (brute-force friction). */
+export const AUTH_THROTTLE = { limit: 5, ttl: 60_000 } as const;

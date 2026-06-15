@@ -4,6 +4,7 @@ import {
   HealthCheckService,
   MongooseHealthIndicator,
 } from '@nestjs/terminus';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ROUTES } from '../common/constants';
 
 /**
@@ -13,6 +14,7 @@ import { ROUTES } from '../common/constants';
  * liveness/readiness matrix. It also underpins zero-downtime deploys
  * (health-gated rolling / nginx blue-green) without any extra code.
  */
+@SkipThrottle()
 @Controller({ path: ROUTES.HEALTH, version: VERSION_NEUTRAL })
 export class HealthController {
   constructor(
