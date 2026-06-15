@@ -31,6 +31,18 @@ services:
     # Not published to the host — only nginx reaches it (same-origin).
     expose:
       - "3000"
+    # Hit the version-neutral /health (Mongoose ping) using node — no curl/wget
+    # needed in the slim image. nginx waits for this before depending on backend.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://localhost:3000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   frontend:
     build:
@@ -38,7 +50,8 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "8080:80"
 

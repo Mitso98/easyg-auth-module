@@ -37,4 +37,20 @@ _TODO: other decisions made against the default AI suggestion._
   reverse-proxying `/api` to the backend.
 - Added `@node-rs/argon2` as the backend password-hasher dependency.
 
-_TODO: subsequent phases (auth API, frontend forms, tests, ...)._
+### Phase 1 — Backend foundation
+
+- **Fail-fast config** — `@nestjs/config` with a Joi schema; app refuses to boot
+  on missing/invalid env (verified: blank `JWT_SECRET` → exit 1). Typed access via
+  `registerAs` namespaces (`app`/`database`/`jwt`), not scattered string lookups.
+- `MONGO_URI` validated by scheme regex (not `Joi.uri()`) so Atlas SRV strings
+  with query options aren't rejected; the URI is never logged (carries credentials).
+- **User schema** — unique index on the normalized (lowercase/trim) email is the
+  DB-enforced one-account invariant (beats an app-level check + its TOCTOU race).
+  Hash protection is layered: `passwordHash: select:false` + a `toJSON` transform
+  that strips `passwordHash`/`__v` and maps `_id`→`id`.
+- `main.ts` wiring: global `api` prefix + URI versioning (default `1`), `/health`
+  excluded (version-neutral Terminus Mongoose ping), global `ValidationPipe`
+  (whitelist/forbid/transform, no implicit conversion), helmet, 16kb body cap,
+  `trust proxy`, shutdown hooks. Compose backend healthcheck hits `/health`.
+
+_TODO: subsequent phases (auth core, hardening, docs/tests, frontend, ops)._
