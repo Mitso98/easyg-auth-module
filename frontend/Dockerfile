@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 
 # ---- Build stage ----
-FROM node:lts-bookworm-slim AS build
+# Node 22: Vite 8 requires Node >=20.19/22.12.
+FROM node:22-bookworm-slim AS build
 WORKDIR /app
 # Baked at build time; relative path kept so the SPA stays same-origin.
 ARG VITE_API_URL=/api/v1

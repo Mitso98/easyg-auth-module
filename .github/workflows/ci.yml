@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Detect which package changed so we only run the legs that matter.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+
+  # lint -> typecheck -> test -> build for each changed package.
+  verify:
+    needs: changes
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        if: ${{ needs.changes.outputs[matrix.package] == 'true' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ${{ matrix.package }}/package-lock.json
+
+      # Cache the pinned mongod binary so the in-process Mongo tests don't re-download.
+      - name: Cache mongodb-memory-server binary
+        if: ${{ matrix.package == 'backend' && needs.changes.outputs.backend == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-7.0.14
+
+      - name: Install
+        if: ${{ needs.changes.outputs[matrix.package] == 'true' }}
+        working-directory: ${{ matrix.package }}
+        run: npm ci
+
+      - name: Lint
+        if: ${{ needs.changes.outputs[matrix.package] == 'true' }}
+        working-directory: ${{ matrix.package }}
+        run: npm run lint
+
+      - name: Typecheck
+        if: ${{ needs.changes.outputs[matrix.package] == 'true' }}
+        working-directory: ${{ matrix.package }}
+        run: npm run typecheck
+
+      - name: Test
+        if: ${{ needs.changes.outputs[matrix.package] == 'true' }}
+        working-directory: ${{ matrix.package }}
+        run: npm test
+
+      - name: Build
+        if: ${{ needs.changes.outputs[matrix.package] == 'true' }}
+        working-directory: ${{ matrix.package }}
+        run: npm run build
+
+  # Generate the OpenAPI spec and upload it as an artifact (proves the docs are
+  # real without a brittle git-diff gate — swagger output isn't byte-stable).
+  openapi:
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install
+        working-directory: backend
+        run: npm ci
+      - name: Generate openapi.json
+        working-directory: backend
+        run: npm run openapi:gen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: openapi.json
+
+  # Build the same-origin image stack (build only — no push).
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Provide backend env (compose env_file; build-time only)
+        run: cp backend/.env.example backend/.env
+      - name: docker compose build
+        run: docker compose build
